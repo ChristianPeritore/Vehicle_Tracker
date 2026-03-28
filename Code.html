@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #3498db;
+            --bg: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        h1 { color: var(--primary); font-size: 2.2em; margin: 0; }
+
+        .lang-select {
+            padding: 10px;
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: white;
+            border: 2px solid var(--primary);
+            outline: none;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border-bottom: 4px solid var(--primary);
+        }
+
+        .stat-card h3 { margin: 0; font-size: 0.9em; opacity: 0.8; }
+        .stat-card p { margin: 10px 0 0; font-size: 1.3em; font-weight: bold; }
+
+        .chart-container {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            height: 300px;
+        }
+
+        .input-section {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        input {
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: #1a1a1a;
+            color: white;
+            outline: none;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        button:hover { background: #2980b9; transform: translateY(-2px); }
+
+        .table-wrapper { overflow-x: auto; width: 100%; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #444;
+        }
+
+        th { background: #3d3d3d; color: var(--primary); }
+
+        .delete-btn {
+            background: #ff4444;
+            padding: 5px 10px;
+            font-size: 0.8em;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1 id="main-title">Monitoraggio Veicolo 🚗</h1>
+        <select id="lang-picker" class="lang-select" onchange="changeLanguage()">
+            <option value="it">🇮🇹</option>
+            <option value="en">🇬🇧</option>
+            <option value="fr">🇫🇷</option>
+            <option value="es">🇪🇸</option>
+            <option value="de">🇩🇪</option>
+        </select>
+    </header>
+
+    <div class="dashboard">
+        <div class="stat-card">
+            <h3 id="label-avg">Media Giornaliera</h3>
+            <p id="avg-km">0 km</p>
+        </div>
+        <div class="stat-card">
+            <h3 id="label-record">Record (Singolo Giorno)</h3>
+            <p id="max-day">--</p>
+        </div>
+        <div class="stat-card">
+            <h3 id="label-odo">Odometro (Parziale)</h3>
+            <p id="total-diff">0 km</p>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="kmChart"></canvas>
+    </div>
+
+    <div class="input-section">
+        <input type="date" id="date-input">
+        <input type="number" id="km-input">
+        <button id="btn-add" onclick="addEntry()">Aggiungi Dato</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="log-table">
+            <thead>
+                <tr>
+                    <th id="th-date">Data</th>
+                    <th id="th-km">Km Veicolo (Sessione)</th>
+                    <th id="th-inc">Incremento</th>
+                    <th id="th-act">Azione</th>
+                </tr>
+            </thead>
+            <tbody id="log-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const translations = {
+        it: {
+            title: "Monitoraggio Veicolo 🚗",
+            avg: "Media Giornaliera",
+            record: "Record (Singolo Giorno)",
+            odo: "Odometro (Parziale)",
+            add: "Aggiungi Dato",
+            thDate: "Data",
+            thKm: "Km Veicolo (Sessione)",
+            thInc: "Incremento",
+            thAct: "Azione",
+            placeholder: "Km totali veicolo",
+            errDuplicate: "Esiste già un dato per questa data.",
+            errLower: "I chilometri non possono essere inferiori all'ultima lettura.",
+            errEmpty: "Inserisci data e chilometri.",
+            confirmDel: "Vuoi eliminare questa lettura?",
+            chartLabel: "Km Veicolo",
+            start: "Inizio"
+        },
+        en: {
+            title: "Vehicle Tracker 🚗",
+            avg: "Daily Average",
+            record: "Record (Single Day)",
+            odo: "Odometer (Partial)",
+            add: "Add Data",
+            thDate: "Date",
+            thKm: "Vehicle Km (Session)",
+            thInc: "Increase",
+            thAct: "Action",
+            placeholder: "Total vehicle Km",
+            errDuplicate: "Data already exists for this date.",
+            errLower: "Km cannot be lower than the last reading.",
+            errEmpty: "Please enter date and kilometers.",
+            confirmDel: "Delete this entry?",
+            chartLabel: "Vehicle Km",
+            start: "Start"
+        },
+        fr: {
+            title: "Suivi du Véhicule 🚗",
+            avg: "Moyenne Quotidienne",
+            record: "Record (Journée Unique)",
+            odo: "Odomètre (Partiel)",
+            add: "Ajouter",
+            thDate: "Date",
+            thKm: "Km Véhicule (Session)",
+            thInc: "Augmentation",
+            thAct: "Action",
+            placeholder: "Km totaux du véhicule",
+            errDuplicate: "Données déjà existantes pour cette date.",
+            errLower: "Les Km non inférieurs à la dernière lecture.",
+            errEmpty: "Entrez la date et les kilomètres.",
+            confirmDel: "Supprimer cette entrée?",
+            chartLabel: "Km du Véhicule",
+            start: "Début"
+        },
+        es: {
+            title: "Rastreador de Vehículo 🚗",
+            avg: "Promedio Diario",
+            record: "Récord (Día Único)",
+            odo: "Odómetro (Parcial)",
+            add: "Añadir Dato",
+            thDate: "Fecha",
+            thKm: "Km Vehículo (Sesión)",
+            thInc: "Incremento",
+            thAct: "Acción",
+            placeholder: "Km totales del vehículo",
+            errDuplicate: "Ya existen datos para esta fecha.",
+            errLower: "Los Km no inferiores a la última lectura.",
+            errEmpty: "Ingrese fecha y kilómetros.",
+            confirmDel: "¿Eliminar esta lectura?",
+            chartLabel: "Km del Vehículo",
+            start: "Inicio"
+        },
+        de: {
+            title: "Fahrzeug-Tracker 🚗",
+            avg: "Tagesdurchschnitt",
+            record: "Rekord (Einzelner Tag)",
+            odo: "Kilometerzähler (Teilweise)",
+            add: "Daten hinzufügen",
+            thDate: "Datum",
+            thKm: "Fahrzeug Km (Sitzung)",
+            thInc: "Zunahme",
+            thAct: "Aktion",
+            placeholder: "Gesamtkilometer Fahrzeug",
+            errDuplicate: "Daten für dieses Datum bereits vorhanden.",
+            errLower: "Km nicht niedriger als der letzte Wert.",
+            errEmpty: "Datum und Kilometer eingeben.",
+            confirmDel: "Diesen Eintrag löschen?",
+            chartLabel: "Fahrzeug Km",
+            start: "Start"
+        }
+    };
+
+    let currentLang = localStorage.getItem('vehicle_lang') || 'it';
+    let entries = JSON.parse(localStorage.getItem('vehicle_km_logs')) || [];
+    let myChart = null;
+
+    function changeLanguage() {
+        currentLang = document.getElementById('lang-picker').value;
+        localStorage.setItem('vehicle_lang', currentLang);
+        applyTranslations();
+        renderTable();
+        calculateStats();
+        updateChart();
+    }
+
+    function applyTranslations() {
+        const t = translations[currentLang];
+        document.getElementById('main-title').innerText = t.title;
+        document.getElementById('label-avg').innerText = t.avg;
+        document.getElementById('label-record').innerText = t.record;
+        document.getElementById('label-odo').innerText = t.odo;
+        document.getElementById('btn-add').innerText = t.add;
+        document.getElementById('th-date').innerText = t.thDate;
+        document.getElementById('th-km').innerText = t.thKm;
+        document.getElementById('th-inc').innerText = t.thInc;
+        document.getElementById('th-act').innerText = t.thAct;
+        document.getElementById('km-input').placeholder = t.placeholder;
+        document.getElementById('lang-picker').value = currentLang;
+    }
+
+    function addEntry() {
+        const t = translations[currentLang];
+        const date = document.getElementById('date-input').value;
+        const km = parseFloat(document.getElementById('km-input').value);
+
+        if (!date || isNaN(km)) {
+            alert(t.errEmpty);
+            return;
+        }
+
+        if (entries.some(e => e.date === date)) {
+            alert(t.errDuplicate);
+            return;
+        }
+
+        if (entries.length > 0) {
+            const previousEntries = entries.filter(e => new Date(e.date) < new Date(date));
+            if (previousEntries.length > 0) {
+                const lastBefore = previousEntries.reduce((p, c) => new Date(p.date) > new Date(c.date) ? p : c);
+                if (km < lastBefore.km) {
+                    alert(t.errLower);
+                    return;
+                }
+            }
+        }
+
+        entries.push({ date, km });
+        entries.sort((a, b) => new Date(a.date) - new Date(b.date));
+        saveAndRefresh();
+        document.getElementById('km-input').value = '';
+    }
+
+    function deleteEntry(index) {
+        if(confirm(translations[currentLang].confirmDel)) {
+            entries.splice(index, 1);
+            saveAndRefresh();
+        }
+    }
+
+    function saveAndRefresh() {
+        localStorage.setItem('vehicle_km_logs', JSON.stringify(entries));
+        renderTable();
+        calculateStats();
+        updateChart();
+    }
+
+    function calculateStats() {
+        if (entries.length < 1) {
+            document.getElementById('avg-km').innerText = "0 km";
+            document.getElementById('max-day').innerText = "--";
+            document.getElementById('total-diff').innerText = "0 km";
+            return;
+        }
+
+        let firstKm = entries[0].km;
+        let lastKm = entries[entries.length - 1].km;
+        let totalSessionKm = lastKm - firstKm;
+        let maxKm = 0;
+        let maxDay = "";
+        let dailyDiffs = [];
+
+        for (let i = 1; i < entries.length; i++) {
+            let diff = entries[i].km - entries[i-1].km;
+            dailyDiffs.push(diff);
+            if (diff > maxKm) {
+                maxKm = diff;
+                maxDay = entries[i].date;
+            }
+        }
+
+        const avg = dailyDiffs.length > 0 ? totalSessionKm / dailyDiffs.length : 0;
+        document.getElementById('avg-km').innerText = avg.toFixed(1) + " km";
+        document.getElementById('max-day').innerText = maxKm + " km (" + maxDay + ")";
+        document.getElementById('total-diff').innerText = `${lastKm} (${totalSessionKm})`;
+    }
+
+    function updateChart() {
+        const ctx = document.getElementById('kmChart').getContext('2d');
+        if (myChart) myChart.destroy();
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: entries.map(e => e.date),
+                datasets: [{
+                    label: translations[currentLang].chartLabel,
+                    data: entries.map(e => e.km),
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { grid: { color: '#444' }, ticks: { color: '#fff' } },
+                    x: { grid: { color: '#444' }, ticks: { color: '#fff' } }
+                },
+                plugins: { legend: { labels: { color: '#fff' } } }
+            }
+        });
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('log-body');
+        tbody.innerHTML = "";
+        if (entries.length === 0) return;
+        const firstKm = entries[0].km;
+
+        entries.forEach((entry, index) => {
+            let diffOggi = index > 0 ? entry.km - entries[index-1].km : 0;
+            let diffDallInizio = entry.km - firstKm;
+            const displayKm = `${entry.km} (${diffDallInizio})`;
+
+            const row = `<tr>
+                <td>${entry.date}</td>
+                <td><strong>${displayKm}</strong></td>
+                <td style="color: ${diffOggi > 0 ? '#2ecc71' : '#fff'}">${index === 0 ? translations[currentLang].start : '+' + diffOggi + ' km'}</td>
+                <td><button class="delete-btn" onclick="deleteEntry(${index})">X</button></td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+
+    document.getElementById('date-input').valueAsDate = new Date();
+    applyTranslations();
+    renderTable();
+    calculateStats();
+    updateChart();
+</script>
+
+</body>
+</html>
