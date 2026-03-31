@@ -40,7 +40,7 @@ The software automatically adapts to your needs with full support for:
    g++ -std=c++17 -o MileageTracker main.cpp
 Launch the application:
 
-./MileageTracker
+MileageTracker
 Installation & Run (Python)
 Run the script directly:
 
