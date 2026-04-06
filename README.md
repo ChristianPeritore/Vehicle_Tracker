@@ -92,5 +92,6 @@ The software automatically adapts to your needs with full support for:
 
 ---
 
-## 📄 License
-This project is open-source and available under the **MIT License**.
+# Example
+<img width="744" height="615" alt="image" src="https://github.com/user-attachments/assets/2aba8633-6e72-4ebf-8bd1-217e8197bd8f" />
+
